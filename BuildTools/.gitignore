@@ -1,0 +1,13 @@
+# Build output
+artifacts/
+bin/
+obj/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# Rider
+.idea/
+*.sln.iml
