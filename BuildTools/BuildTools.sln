@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.1.11304.174 d18.0
+VisualStudioVersion = 18.1.11304.174
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LumaCore.OpenApiGen", "src\LumaCore.OpenApiGen\LumaCore.OpenApiGen.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
@@ -15,6 +15,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenAPI", "OpenAPI", "{1945
 		..\OpenApi\generate-api-docs.ps1 = ..\OpenApi\generate-api-docs.ps1
 		..\OpenApi\README.md = ..\OpenApi\README.md
 		..\OpenApi\verify-api-docs.ps1 = ..\OpenApi\verify-api-docs.ps1
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Repository Files", "Repository Files", "{160E2C10-8F82-43DF-AD62-281E8A0EE69F}"
+	ProjectSection(SolutionItems) = preProject
+		..\.editorconfig = ..\.editorconfig
+		..\.gitattributes = ..\.gitattributes
+		..\LICENSE = ..\LICENSE
+		..\README.md = ..\README.md
+		..\ReSharper.DotSettings = ..\ReSharper.DotSettings
 	EndProjectSection
 EndProject
 Global
