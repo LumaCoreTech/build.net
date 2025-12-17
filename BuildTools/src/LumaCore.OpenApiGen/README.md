@@ -7,7 +7,7 @@ A .NET CLI tool that generates GitHub-friendly Markdown documentation from OpenA
 - Parses OpenAPI 3.x JSON specifications
 - **Quick Reference** table with all endpoints at a glance
 - Color-coded HTTP methods (🟢 GET, 🔵 POST, 🟠 PUT, 🟡 PATCH, 🔴 DELETE)
-- Multi-language code samples (Shell, C#, JavaScript, Python)
+- Multi-language code samples (Shell, C#, JavaScript, Python) with request body examples
 - Schema documentation with JSON examples
 - Clean table-based response status documentation
 - Navigation links back to Quick Reference
@@ -56,7 +56,7 @@ The generated Markdown includes:
      - Parameters (collapsible)
      - Request body
      - Responses (table format)
-     - Code samples (collapsible)
+     - Code samples (collapsible) – includes request body examples for POST/PUT/PATCH
      - Navigation link back to Quick Reference
 5. **Schemas** – All component schemas with property tables and examples
 

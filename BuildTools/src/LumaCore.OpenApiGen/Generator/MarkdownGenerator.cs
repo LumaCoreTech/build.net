@@ -287,23 +287,37 @@ sealed class MarkdownGenerator
 	}
 
 	/// <summary>
-	/// Extracts the first sentence from a summary.
+	/// Extracts the first sentence from a summary and escapes it for table use.
 	/// </summary>
 	/// <param name="summary">The summary text.</param>
-	/// <returns>The first sentence, or the full summary if no period is found.</returns>
+	/// <returns>The first sentence, escaped for Markdown tables.</returns>
 	private static string GetFirstSentence(string? summary)
 	{
 		if (string.IsNullOrWhiteSpace(summary)) return "—";
 
 		// Get the first sentence (up to and including the first period)
 		int periodIndex = summary.IndexOf('.');
-		if (periodIndex > 0)
-		{
-			return summary[..(periodIndex + 1)];
-		}
+		string result = periodIndex > 0 ? summary[..(periodIndex + 1)] : summary;
 
-		// No period found - return as-is
-		return summary;
+		return SanitizeForTable(result);
+	}
+
+	/// <summary>
+	/// Sanitizes a string for use in Markdown table cells.
+	/// </summary>
+	/// <param name="text">The text to sanitize.</param>
+	/// <returns>The sanitized text with newlines removed and pipes escaped.</returns>
+	/// <remarks>
+	/// Line endings are already normalized to LF by <see cref="OpenApiParser"/>,
+	/// so only <c>\n</c> needs to be handled here.
+	/// </remarks>
+	private static string SanitizeForTable(string? text)
+	{
+		if (string.IsNullOrWhiteSpace(text)) return "";
+
+		return text
+			.Replace("\n", " ")
+			.Replace("|", "\\|");
 	}
 
 	/// <summary>
@@ -387,7 +401,7 @@ sealed class MarkdownGenerator
 		{
 			string type = GetTypeString(param.Schema?.Type) ?? "string";
 			string required = param.Required ? "✓" : "";
-			string description = param.Description?.Replace("\n", " ") ?? "";
+			string description = SanitizeForTable(param.Description);
 			sb.AppendLine(sInv, $"| `{param.Name}` | {param.In} | `{type}` | {required} | {description} |");
 		}
 
@@ -450,8 +464,8 @@ sealed class MarkdownGenerator
 			               statusCode.StartsWith('4') ? "⚠️" :
 			               statusCode.StartsWith('5') ? "❌" : "ℹ️";
 
-			// Escape pipe characters in description for table compatibility
-			string description = response.Description?.Replace("|", "\\|") ?? "";
+			// Sanitize description for table cell
+			string description = SanitizeForTable(response.Description);
 
 			sb.AppendLine(sInv, $"| {emoji} {statusCode} | {description} |");
 
@@ -562,12 +576,11 @@ sealed class MarkdownGenerator
 	/// <param name="sb">The <see cref="StringBuilder"/> to append to.</param>
 	/// <param name="path">The endpoint path for the request URL.</param>
 	/// <param name="method">The HTTP method to use in samples.</param>
-	/// <param name="operation">The operation (unused, reserved for future enhancements).</param>
+	/// <param name="operation">The operation containing request body information.</param>
 	private void AppendCodeSamples(
-		StringBuilder sb,
-		string        path,
-		HttpMethod    method,
-		// ReSharper disable once UnusedParameter.Local
+		StringBuilder    sb,
+		string           path,
+		HttpMethod       method,
 		OpenApiOperation operation)
 	{
 		if (mCodeSampleLanguages.Count == 0) return;
@@ -579,6 +592,11 @@ sealed class MarkdownGenerator
 		string methodLower = method.ToString().ToLowerInvariant();
 		string methodUpper = method.ToString().ToUpperInvariant();
 
+		// Check if this endpoint has a request body
+		bool hasRequestBody = operation.RequestBody?.Content?.Count > 0;
+		string? exampleJson = hasRequestBody ? GetRequestBodyExampleJson(operation.RequestBody!) : null;
+		string? exampleJsonCompact = exampleJson?.Replace("\n", "").Replace("  ", "");
+
 		if (mCodeSampleLanguages.Contains("shell"))
 		{
 			sb.AppendLine("**Shell (curl)**");
@@ -586,7 +604,15 @@ sealed class MarkdownGenerator
 			sb.AppendLine("```bash");
 			sb.AppendLine(sInv, $"curl -X {methodUpper} \"{{BASE_URL}}{path}\" \\");
 			sb.AppendLine("  -H \"Authorization: Bearer $TOKEN\" \\");
-			sb.AppendLine("  -H \"Content-Type: application/json\"");
+			if (hasRequestBody && exampleJsonCompact is not null)
+			{
+				sb.AppendLine("  -H \"Content-Type: application/json\" \\");
+				sb.AppendLine(sInv, $"  -d '{exampleJsonCompact}'");
+			}
+			else
+			{
+				sb.AppendLine("  -H \"Content-Type: application/json\"");
+			}
 			sb.AppendLine("```");
 			sb.AppendLine();
 		}
@@ -600,8 +626,22 @@ sealed class MarkdownGenerator
 			sb.AppendLine("client.DefaultRequestHeaders.Authorization =");
 			sb.AppendLine("    new AuthenticationHeaderValue(\"Bearer\", token);");
 			sb.AppendLine();
-			sb.AppendLine(sInv, $"var response = await client.{ToCSharpMethod(method)}Async(");
-			sb.AppendLine(sInv, $"    $\"{{baseUrl}}{path}\");");
+			if (hasRequestBody)
+			{
+				sb.AppendLine("var content = new StringContent(");
+				sb.AppendLine("    JsonSerializer.Serialize(requestBody),");
+				sb.AppendLine("    Encoding.UTF8,");
+				sb.AppendLine("    \"application/json\");");
+				sb.AppendLine();
+				sb.AppendLine(sInv, $"var response = await client.{ToCSharpMethod(method)}Async(");
+				sb.AppendLine(sInv, $"    $\"{{baseUrl}}{path}\",");
+				sb.AppendLine("    content);");
+			}
+			else
+			{
+				sb.AppendLine(sInv, $"var response = await client.{ToCSharpMethod(method)}Async(");
+				sb.AppendLine(sInv, $"    $\"{{baseUrl}}{path}\");");
+			}
 			sb.AppendLine("```");
 			sb.AppendLine();
 		}
@@ -616,7 +656,15 @@ sealed class MarkdownGenerator
 			sb.AppendLine("  headers: {");
 			sb.AppendLine("    'Authorization': `Bearer ${token}`,");
 			sb.AppendLine("    'Content-Type': 'application/json'");
-			sb.AppendLine("  }");
+			if (hasRequestBody)
+			{
+				sb.AppendLine("  },");
+				sb.AppendLine("  body: JSON.stringify(requestBody)");
+			}
+			else
+			{
+				sb.AppendLine("  }");
+			}
 			sb.AppendLine("});");
 			sb.AppendLine("```");
 			sb.AppendLine();
@@ -631,7 +679,15 @@ sealed class MarkdownGenerator
 			sb.AppendLine();
 			sb.AppendLine(sInv, $"response = requests.{methodLower}(");
 			sb.AppendLine(sInv, $"    f\"{{BASE_URL}}{path}\",");
-			sb.AppendLine("    headers={\"Authorization\": f\"Bearer {token}\"}");
+			if (hasRequestBody)
+			{
+				sb.AppendLine("    headers={\"Authorization\": f\"Bearer {token}\"},");
+				sb.AppendLine("    json=request_body");
+			}
+			else
+			{
+				sb.AppendLine("    headers={\"Authorization\": f\"Bearer {token}\"}");
+			}
 			sb.AppendLine(")");
 			sb.AppendLine("```");
 			sb.AppendLine();
@@ -639,6 +695,38 @@ sealed class MarkdownGenerator
 
 		sb.AppendLine("</details>");
 		sb.AppendLine();
+	}
+
+	/// <summary>
+	/// Extracts an example JSON string from a request body definition.
+	/// </summary>
+	/// <param name="requestBody">The request body to extract an example from.</param>
+	/// <returns>
+	/// A JSON string representing an example request body, or <see langword="null"/>
+	/// if no schema is available.
+	/// </returns>
+	private static string? GetRequestBodyExampleJson(IOpenApiRequestBody requestBody)
+	{
+		// Try to find application/json content
+		if (requestBody.Content is null) return null;
+
+		foreach ((string contentType, IOpenApiMediaType mediaType) in requestBody.Content)
+		{
+			if (!contentType.Contains("json", StringComparison.OrdinalIgnoreCase)) continue;
+			if (mediaType.Schema is null) continue;
+
+			// Handle both direct schemas and schema references
+			OpenApiSchema? schema = mediaType.Schema switch
+			{
+				OpenApiSchema direct             => direct,
+				OpenApiSchemaReference schemaRef => schemaRef.Target as OpenApiSchema,
+				var _                            => null
+			};
+
+			if (schema is not null) return SchemaToExampleJson(schema);
+		}
+
+		return null;
 	}
 
 	/// <summary>
@@ -681,7 +769,7 @@ sealed class MarkdownGenerator
 				{
 					string type = GetSchemaTypeString(propSchemaInterface);
 					string required = schema.Required?.Contains(propName) == true ? "✓" : "";
-					string description = (propSchemaInterface as OpenApiSchema)?.Description?.Replace("\n", " ") ?? "";
+					string description = SanitizeForTable((propSchemaInterface as OpenApiSchema)?.Description);
 					sb.AppendLine(sInv, $"| `{propName}` | `{type}` | {required} | {description} |");
 				}
 

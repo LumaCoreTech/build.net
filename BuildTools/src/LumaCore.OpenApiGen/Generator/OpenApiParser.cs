@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 // Project: https://github.com/LumaCoreTech/build.net
 
+using System.Text;
+
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
 
@@ -19,6 +21,10 @@ namespace LumaCore.OpenApiGen.Generator;
 ///     <para>
 ///     Supports OpenAPI 3.0, 3.1, and 3.2 specifications in JSON format. YAML files are not
 ///     directly supported but can be converted to JSON before parsing.
+///     </para>
+///     <para>
+///     Line endings are normalized to LF (<c>\n</c>) during parsing to ensure consistent
+///     handling across platforms.
 ///     </para>
 /// </remarks>
 sealed class OpenApiParser
@@ -60,8 +66,13 @@ sealed class OpenApiParser
 	/// </remarks>
 	public static async Task<OpenApiDocument?> ParseAsync(string filePath)
 	{
-		// Open the file stream for reading.
-		await using FileStream stream = File.OpenRead(filePath);
+		// Read file content and normalize line endings to LF.
+		// This ensures consistent handling of descriptions across Windows/Unix.
+		string content = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+		content = NormalizeLineEndings(content);
+
+		// Create a memory stream from the normalized content.
+		await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
 
 		// Parse the OpenAPI document using the v3 API (tuple deconstruction).
 		(OpenApiDocument? document, OpenApiDiagnostic? diagnostic) = await OpenApiDocument.LoadAsync(stream).ConfigureAwait(false);
@@ -89,4 +100,21 @@ sealed class OpenApiParser
 		// Return the successfully parsed document.
 		return document;
 	}
+
+	/// <summary>
+	/// Normalizes line endings to LF (<c>\n</c>).
+	/// </summary>
+	/// <param name="text">The text to normalize.</param>
+	/// <returns>The text with all line endings converted to LF.</returns>
+	/// <remarks>
+	/// Handles both actual line breaks in the file and JSON-escaped sequences
+	/// (e.g., <c>\r\n</c> stored as <c>\\r\\n</c> in JSON strings).
+	/// </remarks>
+	private static string NormalizeLineEndings(string text) => text
+		// Normalize JSON-escaped line endings within string values
+		.Replace("\\r\\n", "\\n")
+		.Replace("\\r", "\\n")
+		// Normalize actual line endings in the file
+		.Replace("\r\n", "\n")
+		.Replace("\r", "\n");
 }
