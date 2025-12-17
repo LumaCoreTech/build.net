@@ -46,6 +46,14 @@ sealed class MarkdownGenerator
 	};
 
 	/// <summary>
+	/// Cached JSON serializer options for compact (single-line) example generation.
+	/// </summary>
+	private static readonly JsonSerializerOptions sJsonOptionsCompact = new()
+	{
+		WriteIndented = false
+	};
+
+	/// <summary>
 	/// The API title displayed in the documentation header.
 	/// </summary>
 	private readonly string mApiTitle;
@@ -595,7 +603,7 @@ sealed class MarkdownGenerator
 		// Check if this endpoint has a request body
 		bool hasRequestBody = operation.RequestBody?.Content?.Count > 0;
 		string? exampleJson = hasRequestBody ? GetRequestBodyExampleJson(operation.RequestBody!) : null;
-		string? exampleJsonCompact = exampleJson?.Replace("\n", "").Replace("  ", "");
+		string? exampleJsonCompact = hasRequestBody ? GetRequestBodyExampleJson(operation.RequestBody!, compact: true) : null;
 
 		if (mCodeSampleLanguages.Contains("shell"))
 		{
@@ -705,7 +713,7 @@ sealed class MarkdownGenerator
 	/// A JSON string representing an example request body, or <see langword="null"/>
 	/// if no schema is available.
 	/// </returns>
-	private static string? GetRequestBodyExampleJson(IOpenApiRequestBody requestBody)
+	private static string? GetRequestBodyExampleJson(IOpenApiRequestBody requestBody, bool compact = false)
 	{
 		// Try to find application/json content
 		if (requestBody.Content is null) return null;
@@ -723,7 +731,7 @@ sealed class MarkdownGenerator
 				var _                            => null
 			};
 
-			if (schema is not null) return SchemaToExampleJson(schema);
+			if (schema is not null) return SchemaToExampleJson(schema, compact);
 		}
 
 		return null;
@@ -956,11 +964,15 @@ sealed class MarkdownGenerator
 	/// Converts an OpenAPI schema to an example JSON string.
 	/// </summary>
 	/// <param name="schema">The schema to convert.</param>
+	/// <param name="compact">
+	/// If <see langword="true"/>, generates single-line JSON without indentation.
+	/// Defaults to <see langword="false"/> for readable, indented output.
+	/// </param>
 	/// <returns>A formatted JSON string representing an example instance of the schema.</returns>
-	private static string SchemaToExampleJson(OpenApiSchema schema)
+	private static string SchemaToExampleJson(OpenApiSchema schema, bool compact = false)
 	{
 		object? example = GenerateExampleValue(schema);
-		return JsonSerializer.Serialize(example, sJsonOptions);
+		return JsonSerializer.Serialize(example, compact ? sJsonOptionsCompact : sJsonOptions);
 	}
 
 	/// <summary>
