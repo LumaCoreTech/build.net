@@ -9,13 +9,15 @@
 .DESCRIPTION
     This script generates static, GitHub-friendly Markdown documentation by:
       1. Building the OpenApiGen tool
-      2. Converting an OpenAPI JSON file to Markdown (with code samples)
+      2. Converting OpenAPI JSON files to Markdown (with code samples)
 
     Supports OpenAPI 3.0, 3.1, and 3.2 specifications.
+    Automatically processes all versioned API documents (v1.json, v2.json, etc.).
 
 .PARAMETER DocsDirectory
-    Directory containing the OpenAPI JSON file and where the Markdown will be written.
-    Expects 'openapi.json' and writes 'README.md'. Defaults to '<Repo>/docs/api'.
+    Directory containing the OpenAPI JSON files and where the Markdown will be written.
+    Expects 'v1.json' (and optionally v2.json, etc.) and writes 'v1.md', 'v2.md', etc.
+    Defaults to '<Repo>/docs/api'.
 
 .PARAMETER CodeSamples
     Languages for code samples (comma-separated). Defaults to 'shell,csharp'.
@@ -27,14 +29,14 @@
     .\build.net\OpenApi\generate-api-docs.ps1 -DocsDirectory docs/api-reference
 
 .NOTES
-    Requires: .NET SDK 8.0+, OpenAPI 3.x JSON file
+    Requires: .NET SDK 8.0+, OpenAPI 3.x JSON file(s)
 #>
 
 #Requires -Version 7.0
 
 [CmdletBinding()]
 param(
-    [Parameter(HelpMessage = "Directory containing openapi.json and where README.md will be written")]
+    [Parameter(HelpMessage = "Directory containing v1.json, v2.json, etc. and where Markdown will be written")]
     [string]$DocsDirectory = "docs/api",
 
     [Parameter(HelpMessage = "Languages for code samples (comma-separated)")]
@@ -55,8 +57,7 @@ if (![System.IO.Path]::IsPathRooted($DocsDirectory)) {
     $DocsDirectory = Join-Path $RepoRoot $DocsDirectory
 }
 
-$InputJson = Join-Path $DocsDirectory "openapi.json"
-$OutputMarkdown = Join-Path $DocsDirectory "README.md"
+# Note: Input/output paths are determined dynamically per version in the generation loop below
 
 # Build tool configuration
 $ToolProject = "$ScriptDir/../BuildTools/src/LumaCore.OpenApiGen/LumaCore.OpenApiGen.csproj"
@@ -130,40 +131,57 @@ if ($LASTEXITCODE -ne 0) {
 Write-Info "Tool built successfully"
 
 # ============================================================================
-# Verify OpenAPI JSON exists
+# Find OpenAPI JSON Files
 # ============================================================================
 
-Write-Info "Checking for OpenAPI specification..."
+Write-Info "Scanning for OpenAPI specifications..."
 
-if (!(Test-Path $InputJson)) {
-    Write-Err "OpenAPI JSON not found at: $InputJson"
+$JsonFiles = Get-ChildItem -Path $DocsDirectory -Filter "v*.json" -File | Sort-Object Name
+
+if ($JsonFiles.Count -eq 0) {
+    Write-Err "No OpenAPI JSON files found (v1.json, v2.json, etc.) in: $DocsDirectory"
+    Write-Err "Run 'dotnet build /p:GenerateOpenApi=true' first to generate the OpenAPI specs."
     exit 1
 }
 
-Write-Info "Found OpenAPI JSON at: $InputJson"
-
-# ============================================================================
-# Generate Markdown Documentation
-# ============================================================================
-
-Write-Info "Generating Markdown documentation..."
-
-dotnet run --project $ToolProject `
-    --configuration Release `
-    --no-build `
-    -- `
-    --input $InputJson `
-    --output $OutputMarkdown `
-    --code-samples $CodeSamples
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Err "Failed to generate Markdown documentation"
-    exit 1
+Write-Info "Found $($JsonFiles.Count) OpenAPI specification(s):"
+foreach ($file in $JsonFiles) {
+    Write-Host "  - $($file.Name)"
 }
 
-if (!(Test-Path $OutputMarkdown)) {
-    Write-Err "Markdown file not generated: $OutputMarkdown"
-    exit 1
+# ============================================================================
+# Generate Markdown Documentation (for each version)
+# ============================================================================
+
+$GeneratedCount = 0
+
+foreach ($JsonFile in $JsonFiles) {
+    $Version = $JsonFile.BaseName  # e.g., "v1" from "v1.json"
+    $InputJson = $JsonFile.FullName
+    $OutputMarkdown = Join-Path $DocsDirectory "$Version.md"
+
+    Write-Info "Generating documentation for $Version..."
+
+    dotnet run --project $ToolProject `
+        --configuration Release `
+        --no-build `
+        -- `
+        --input $InputJson `
+        --output $OutputMarkdown `
+        --code-samples $CodeSamples
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Failed to generate Markdown documentation for $Version"
+        exit 1
+    }
+
+    if (!(Test-Path $OutputMarkdown)) {
+        Write-Err "Markdown file not generated: $OutputMarkdown"
+        exit 1
+    }
+
+    $GeneratedCount++
+    Write-Info "Generated: $OutputMarkdown"
 }
 
 # ============================================================================
@@ -173,5 +191,9 @@ if (!(Test-Path $OutputMarkdown)) {
 Write-Host ""
 Write-Info "API documentation generated successfully!"
 Write-Host ""
-Write-Host "  Input:  $InputJson"
-Write-Host "  Output: $OutputMarkdown"
+Write-Host "  Directory: $DocsDirectory"
+Write-Host "  Generated: $GeneratedCount file(s)"
+foreach ($JsonFile in $JsonFiles) {
+    $Version = $JsonFile.BaseName
+    Write-Host "    - $Version.json -> $Version.md"
+}

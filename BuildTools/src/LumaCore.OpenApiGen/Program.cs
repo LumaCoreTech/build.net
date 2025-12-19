@@ -151,7 +151,7 @@ static class Program
 			}
 
 			// Log parsed document info.
-			await Console.Out.WriteLineAsync($"Parsed: {document.Info.Title} v{document.Info.Version}").ConfigureAwait(false);
+			await Console.Out.WriteLineAsync($"Parsed: {document.Info.Title} {document.Info.Version}").ConfigureAwait(false);
 
 			// Generate Markdown documentation.
 			// Split comma-separated languages into array.

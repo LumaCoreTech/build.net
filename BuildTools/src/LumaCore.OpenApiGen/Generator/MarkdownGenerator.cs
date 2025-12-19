@@ -709,6 +709,10 @@ sealed class MarkdownGenerator
 	/// Extracts an example JSON string from a request body definition.
 	/// </summary>
 	/// <param name="requestBody">The request body to extract an example from.</param>
+	/// <param name="compact">
+	/// If <see langword="true"/>, returns a single-line JSON string; otherwise,
+	/// returns formatted JSON with indentation.
+	/// </param>
 	/// <returns>
 	/// A JSON string representing an example request body, or <see langword="null"/>
 	/// if no schema is available.
