@@ -334,9 +334,18 @@ foreach ($TempJson in $TempJsonFiles) {
     # Compare JSON specs (semantically, not line-by-line)
     # JSON key order can differ between Windows/Linux, so we normalize both files
     # by parsing and re-serializing with sorted keys before comparison.
+    # Line endings are also normalized (CRLF → LF) to avoid Windows/Linux differences.
     try {
         $committedNormalized = ConvertTo-SortedJson -JsonPath $CommittedJson
         $freshNormalized = ConvertTo-SortedJson -JsonPath $TempJson.FullName
+        
+        # Normalize escaped line endings in JSON strings (\r\n → \n)
+        $committedNormalized = $committedNormalized -replace '\\r\\n', '\n'
+        $freshNormalized = $freshNormalized -replace '\\r\\n', '\n'
+        
+        # Also normalize actual line endings (CRLF → LF)
+        $committedNormalized = $committedNormalized -replace "`r`n", "`n"
+        $freshNormalized = $freshNormalized -replace "`r`n", "`n"
         
         $jsonDiff = $committedNormalized -ne $freshNormalized
     }

@@ -159,6 +159,19 @@ foreach ($Version in $Versions) {
         exit 1
     }
 
+    # Normalize line endings in the generated JSON
+    # On Windows, Git's autocrlf may cause the C# source files to have CRLF
+    # in the working copy, which gets embedded in XMLDoc descriptions.
+    # These appear as escaped \r\n sequences in JSON strings.
+    # This ensures consistent output regardless of platform.
+    $jsonContent = Get-Content $OutputFile -Raw
+    # Replace escaped CRLF in JSON strings (\r\n → \n)
+    $jsonContent = $jsonContent -replace '\\r\\n', '\n'
+    # Also normalize actual file line endings (CRLF → LF)
+    $jsonContent = $jsonContent -replace "`r`n", "`n"
+    # Use .NET to write without BOM and with LF endings
+    [System.IO.File]::WriteAllText($OutputFile, $jsonContent)
+
     $GeneratedCount++
     Write-Info "Generated: $OutputFile"
 }
