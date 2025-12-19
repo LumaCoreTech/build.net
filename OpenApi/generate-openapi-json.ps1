@@ -12,11 +12,11 @@
     named output files (v1.json, v2.json, etc.).
 
     The Microsoft.Extensions.ApiDescription.Server package has inconsistent naming:
-    - v1 documents produce {ProjectName}.json
-    - Other versions produce {ProjectName}_{version}.json
+    - First/default version: v1.json (correct)
+    - Additional versions: v2_v2.json (duplicates the version suffix)
 
-    This script works around that by explicitly specifying --document-name and
-    --file-name for each version.
+    This script works around that by detecting the quirky names and renaming them
+    to the expected format (v2.json, v3.json, etc.).
 
 .PARAMETER ApiProject
     Path to the API project file (.csproj). Defaults to 'src/LumaCore.Api/LumaCore.Api.csproj'.
@@ -126,12 +126,18 @@ foreach ($Version in $Versions) {
 
     # Build with specific document-name and file-name to get consistent output
     # ASPNETCORE_ENVIRONMENT=Development required for OpenAPI endpoint exposure
+    # UseSharedCompilation=false bypasses the MSBuild server cache to ensure
+    # our /p: properties are respected (avoids "global property cannot be changed" issue)
+    # --no-incremental forces a full rebuild because OpenAPI generation happens at
+    # build time - without it, subsequent versions are skipped as "up-to-date"
     $env:ASPNETCORE_ENVIRONMENT = "Development"
 
     dotnet build $ApiProject `
         --configuration Release `
+        --no-incremental `
+        /p:UseSharedCompilation=false `
         /p:OpenApiGenerateDocuments=true `
-        /p:OpenApiDocumentsDirectory=$DocsDirectory `
+        "/p:OpenApiDocumentsDirectory=$DocsDirectory" `
         "/p:OpenApiGenerateDocumentsOptions=--document-name $Version --file-name $Version" `
         --verbosity quiet `
         --nologo
@@ -139,6 +145,13 @@ foreach ($Version in $Versions) {
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Failed to generate OpenAPI JSON for $Version"
         exit 1
+    }
+
+    # Microsoft's naming is inconsistent: v1 → v1.json, but v2 → v2_v2.json
+    # Check for the quirky name and rename if needed
+    $QuirkyFile = Join-Path $DocsDirectory "$Version`_$Version.json"
+    if ((Test-Path $QuirkyFile) -and !(Test-Path $OutputFile)) {
+        Move-Item $QuirkyFile $OutputFile -Force
     }
 
     if (!(Test-Path $OutputFile)) {

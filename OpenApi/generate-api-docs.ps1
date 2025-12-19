@@ -140,7 +140,7 @@ $JsonFiles = Get-ChildItem -Path $DocsDirectory -Filter "v*.json" -File | Sort-O
 
 if ($JsonFiles.Count -eq 0) {
     Write-Err "No OpenAPI JSON files found (v1.json, v2.json, etc.) in: $DocsDirectory"
-    Write-Err "Run 'dotnet build /p:GenerateOpenApi=true' first to generate the OpenAPI specs."
+    Write-Err "Run './build.net/OpenApi/generate-openapi-json.ps1' first to generate the OpenAPI specs."
     exit 1
 }
 

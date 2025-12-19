@@ -190,8 +190,10 @@ foreach ($CommittedJson in $CommittedJsonFiles) {
 
     dotnet build $ApiProject `
         --configuration Release `
+        --no-incremental `
+        /p:UseSharedCompilation=false `
         /p:OpenApiGenerateDocuments=true `
-        /p:OpenApiDocumentsDirectory=$TempDir `
+        "/p:OpenApiDocumentsDirectory=$TempDir" `
         "/p:OpenApiGenerateDocumentsOptions=--document-name $Version --file-name $Version" `
         --verbosity quiet `
         --nologo
@@ -200,6 +202,14 @@ foreach ($CommittedJson in $CommittedJsonFiles) {
         Write-Err "Build failed for $Version"
         Remove-TempDirectory
         exit 1
+    }
+
+    # Microsoft's naming is inconsistent: v1 → v1.json, but v2 → v2_v2.json
+    # Check for the quirky name and rename if needed
+    $ExpectedFile = Join-Path $TempDir "$Version.json"
+    $QuirkyFile = Join-Path $TempDir "$Version`_$Version.json"
+    if ((Test-Path $QuirkyFile) -and !(Test-Path $ExpectedFile)) {
+        Move-Item $QuirkyFile $ExpectedFile -Force
     }
 }
 
