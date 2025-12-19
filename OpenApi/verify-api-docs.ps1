@@ -102,6 +102,57 @@ function Remove-TempDirectory {
     }
 }
 
+function ConvertTo-SortedJson {
+    <#
+    .SYNOPSIS
+        Converts an object to JSON with keys sorted alphabetically (recursively).
+    .DESCRIPTION
+        JSON key order can differ between Windows and Linux due to dictionary
+        serialization differences. This function normalizes JSON by sorting all
+        object keys alphabetically, enabling reliable cross-platform comparison.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$JsonPath
+    )
+    
+    # Parse JSON and recursively sort all object keys
+    $content = Get-Content $JsonPath -Raw
+    $obj = $content | ConvertFrom-Json -Depth 100
+    
+    function Sort-ObjectRecursively {
+        param($InputObject)
+        
+        if ($null -eq $InputObject) {
+            return $null
+        }
+        
+        if ($InputObject -is [System.Collections.IList]) {
+            # Array: sort each element recursively
+            $result = @()
+            foreach ($item in $InputObject) {
+                $result += Sort-ObjectRecursively $item
+            }
+            return $result
+        }
+        
+        if ($InputObject -is [PSCustomObject]) {
+            # Object: sort keys and recurse into values
+            $sorted = [ordered]@{}
+            $InputObject.PSObject.Properties.Name | Sort-Object | ForEach-Object {
+                $sorted[$_] = Sort-ObjectRecursively $InputObject.$_
+            }
+            return [PSCustomObject]$sorted
+        }
+        
+        # Primitive value: return as-is
+        return $InputObject
+    }
+    
+    $sorted = Sort-ObjectRecursively $obj
+    return $sorted | ConvertTo-Json -Depth 100 -Compress
+}
+
 # Ensure cleanup on script exit
 trap {
     Remove-TempDirectory
@@ -280,14 +331,55 @@ foreach ($TempJson in $TempJsonFiles) {
         exit 1
     }
 
-    # Compare JSON specs
-    $jsonDiff = Compare-Object -ReferenceObject (Get-Content $CommittedJson) -DifferenceObject (Get-Content $TempJson.FullName)
+    # Compare JSON specs (semantically, not line-by-line)
+    # JSON key order can differ between Windows/Linux, so we normalize both files
+    # by parsing and re-serializing with sorted keys before comparison.
+    try {
+        $committedNormalized = ConvertTo-SortedJson -JsonPath $CommittedJson
+        $freshNormalized = ConvertTo-SortedJson -JsonPath $TempJson.FullName
+        
+        $jsonDiff = $committedNormalized -ne $freshNormalized
+    }
+    catch {
+        Write-Err "Failed to parse JSON for comparison: $_"
+        Remove-TempDirectory
+        exit 1
+    }
 
     if ($jsonDiff) {
         Write-Err "OpenAPI specification $Version.json is outdated!"
         Write-Host ""
-        Write-Host "Differences in $Version.json:"
-        $jsonDiff | Format-Table -AutoSize
+        Write-Host "The API surface has changed. Differences detected in $Version.json."
+        Write-Host ""
+        
+        # Find first difference position for debugging
+        $minLen = [Math]::Min($committedNormalized.Length, $freshNormalized.Length)
+        $diffPos = -1
+        for ($i = 0; $i -lt $minLen; $i++) {
+            if ($committedNormalized[$i] -ne $freshNormalized[$i]) {
+                $diffPos = $i
+                break
+            }
+        }
+        
+        if ($diffPos -eq -1 -and $committedNormalized.Length -ne $freshNormalized.Length) {
+            $diffPos = $minLen
+            Write-Host "Length difference: Committed=$($committedNormalized.Length), Generated=$($freshNormalized.Length)" -ForegroundColor Yellow
+        }
+        
+        if ($diffPos -ge 0) {
+            $contextStart = [Math]::Max(0, $diffPos - 100)
+            $contextEnd = [Math]::Min($minLen, $diffPos + 100)
+            
+            Write-Host "First difference at position $diffPos" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Committed (around diff):" -ForegroundColor Cyan
+            Write-Host $committedNormalized.Substring($contextStart, [Math]::Min($contextEnd - $contextStart, $committedNormalized.Length - $contextStart))
+            Write-Host ""
+            Write-Host "Generated (around diff):" -ForegroundColor Cyan
+            Write-Host $freshNormalized.Substring($contextStart, [Math]::Min($contextEnd - $contextStart, $freshNormalized.Length - $contextStart))
+        }
+        
         Write-Host ""
         Write-Err "Please regenerate the API documentation."
         Remove-TempDirectory
