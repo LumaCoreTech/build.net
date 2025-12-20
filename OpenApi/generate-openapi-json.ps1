@@ -176,6 +176,10 @@ foreach ($Version in $Versions) {
     $jsonContent = $jsonContent -replace '\\n\s{2,}', '\n'
     # Also normalize actual file line endings (CRLF → LF)
     $jsonContent = $jsonContent -replace "`r`n", "`n"
+    # Ensure file ends with a newline (POSIX compliance, avoids ReSharper/Git diffs)
+    if (!$jsonContent.EndsWith("`n")) {
+        $jsonContent += "`n"
+    }
     # Use .NET to write without BOM and with LF endings
     [System.IO.File]::WriteAllText($OutputFile, $jsonContent)
 
