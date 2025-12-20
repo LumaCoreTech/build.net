@@ -230,38 +230,21 @@ Write-Info "Tool built successfully"
 
 Write-Info "Building API with OpenAPI document generation..."
 
-# IMPORTANT: Development environment required because Production mode
-# may expect secrets that aren't available during build/CI
-$env:ASPNETCORE_ENVIRONMENT = "Development"
+# Extract version names from committed JSON files
+$VersionNames = $CommittedJsonFiles | ForEach-Object { $_.BaseName }
 
-# Generate OpenAPI JSON for each committed version
-foreach ($CommittedJson in $CommittedJsonFiles) {
-    $Version = $CommittedJson.BaseName  # e.g., "v1" from "v1.json"
-    Write-Info "Generating $Version.json..."
+# Use generate-openapi-json.ps1 for consistent normalization
+# This ensures the same post-processing (empty arrays, whitespace fixes) is applied
+# both during local generation and CI verification.
+& "$ScriptDir/generate-openapi-json.ps1" `
+    -ApiProject $ApiProject `
+    -DocsDirectory $TempDir `
+    -Versions $VersionNames
 
-    dotnet build $ApiProject `
-        --configuration Release `
-        --no-incremental `
-        /p:UseSharedCompilation=false `
-        /p:OpenApiGenerateDocuments=true `
-        "/p:OpenApiDocumentsDirectory=$TempDir" `
-        "/p:OpenApiGenerateDocumentsOptions=--document-name $Version --file-name $Version" `
-        --verbosity quiet `
-        --nologo
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "Build failed for $Version"
-        Remove-TempDirectory
-        exit 1
-    }
-
-    # Microsoft's naming is inconsistent: v1 → v1.json, but v2 → v2_v2.json
-    # Check for the quirky name and rename if needed
-    $ExpectedFile = Join-Path $TempDir "$Version.json"
-    $QuirkyFile = Join-Path $TempDir "$Version`_$Version.json"
-    if ((Test-Path $QuirkyFile) -and !(Test-Path $ExpectedFile)) {
-        Move-Item $QuirkyFile $ExpectedFile -Force
-    }
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "Failed to generate OpenAPI specs"
+    Remove-TempDirectory
+    exit 1
 }
 
 Write-Info "Build completed successfully"
@@ -334,7 +317,7 @@ foreach ($TempJson in $TempJsonFiles) {
     # Compare JSON specs (semantically, not line-by-line)
     # JSON key order can differ between Windows/Linux, so we normalize both files
     # by parsing and re-serializing with sorted keys before comparison.
-    # Line endings are also normalized (CRLF → LF) to avoid Windows/Linux differences.
+    # Additional normalizations handle platform differences and .NET generator quirks.
     try {
         $committedNormalized = ConvertTo-SortedJson -JsonPath $CommittedJson
         $freshNormalized = ConvertTo-SortedJson -JsonPath $TempJson.FullName
@@ -342,6 +325,15 @@ foreach ($TempJson in $TempJsonFiles) {
         # Normalize escaped line endings in JSON strings (\r\n → \n)
         $committedNormalized = $committedNormalized -replace '\\r\\n', '\n'
         $freshNormalized = $freshNormalized -replace '\\r\\n', '\n'
+        
+        # Normalize empty arrays: [ ] → [] (System.Text.Json quirk)
+        $committedNormalized = $committedNormalized -replace '\[ \]', '[]'
+        $freshNormalized = $freshNormalized -replace '\[ \]', '[]'
+        
+        # Normalize excessive whitespace after newlines in JSON strings.
+        # See: https://github.com/dotnet/aspnetcore/issues/62970
+        $committedNormalized = $committedNormalized -replace '\\n\s{2,}', '\n'
+        $freshNormalized = $freshNormalized -replace '\\n\s{2,}', '\n'
         
         # Also normalize actual line endings (CRLF → LF)
         $committedNormalized = $committedNormalized -replace "`r`n", "`n"

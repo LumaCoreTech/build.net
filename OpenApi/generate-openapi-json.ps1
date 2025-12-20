@@ -167,6 +167,13 @@ foreach ($Version in $Versions) {
     $jsonContent = Get-Content $OutputFile -Raw
     # Replace escaped CRLF in JSON strings (\r\n → \n)
     $jsonContent = $jsonContent -replace '\\r\\n', '\n'
+    # Normalize empty arrays: [ ] → [] (System.Text.Json quirk)
+    $jsonContent = $jsonContent -replace '\[ \]', '[]'
+    # Normalize excessive whitespace after newlines in JSON strings.
+    # The .NET OpenAPI generator incorrectly preserves indentation from multi-line
+    # XML documentation comments, resulting in strings like "text;\n            more text".
+    # See: https://github.com/dotnet/aspnetcore/issues/62970
+    $jsonContent = $jsonContent -replace '\\n\s{2,}', '\n'
     # Also normalize actual file line endings (CRLF → LF)
     $jsonContent = $jsonContent -replace "`r`n", "`n"
     # Use .NET to write without BOM and with LF endings
