@@ -179,7 +179,9 @@ sealed class MarkdownGenerator
 		sb.AppendLine("- [Endpoints](#endpoints)");
 		sb.AppendLine("  - [Quick Reference](#quick-reference)");
 
-		Dictionary<string, List<(string Path, HttpMethod Method, OpenApiOperation Operation)>> taggedPaths = GetEndpointsByTag(document);
+		Dictionary<string, List<(string Path, HttpMethod Method, OpenApiOperation Operation)>> taggedPaths =
+			GetEndpointsByTag(document);
+
 		foreach (string tag in taggedPaths.Keys.OrderBy(t => t, StringComparer.Ordinal))
 		{
 			string anchor = ToAnchor(tag);
@@ -245,12 +247,14 @@ sealed class MarkdownGenerator
 		sb.AppendLine("## Endpoints");
 		sb.AppendLine();
 
-		Dictionary<string, List<(string Path, HttpMethod Method, OpenApiOperation Operation)>> taggedPaths = GetEndpointsByTag(document);
+		Dictionary<string, List<(string Path, HttpMethod Method, OpenApiOperation Operation)>> taggedPaths =
+			GetEndpointsByTag(document);
 
 		// Generate quick reference overview table
 		AppendEndpointOverview(sb, taggedPaths);
 
-		foreach ((string tag, List<(string Path, HttpMethod Method, OpenApiOperation Operation)> endpoints) in taggedPaths.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+		foreach ((string tag, List<(string Path, HttpMethod Method, OpenApiOperation Operation)> endpoints) in
+		         taggedPaths.OrderBy(kv => kv.Key, StringComparer.Ordinal))
 		{
 			sb.AppendLine(sInv, $"### {tag}");
 			sb.AppendLine();
@@ -277,14 +281,16 @@ sealed class MarkdownGenerator
 		sb.AppendLine("| Method | Endpoint | Description |");
 		sb.AppendLine("|--------|----------|-------------|");
 
-		foreach ((string _, List<(string Path, HttpMethod Method, OpenApiOperation Operation)> endpoints) in taggedPaths.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+		foreach ((string _, List<(string Path, HttpMethod Method, OpenApiOperation Operation)> endpoints) in
+		         taggedPaths.OrderBy(kv => kv.Key, StringComparer.Ordinal))
 		{
 			foreach ((string path, HttpMethod method, OpenApiOperation operation) in
 			         endpoints.OrderBy(e => e.Path, StringComparer.Ordinal).ThenBy(e => e.Method))
 			{
 				string methodUpper = method.ToString().ToUpperInvariant();
 				string methodDot = GetMethodDot(method);
-				string anchor = $"{methodUpper.ToLowerInvariant()}-{path.Replace("/", "").Replace("{", "").Replace("}", "")}";
+				string anchor =
+					$"{methodUpper.ToLowerInvariant()}-{path.Replace("/", "").Replace("{", "").Replace("}", "")}";
 				string summary = GetFirstSentence(operation.Summary);
 
 				sb.AppendLine(sInv, $"| {methodDot} {methodUpper} | [`{path}`](#{anchor}) | {summary} |");
@@ -465,7 +471,8 @@ sealed class MarkdownGenerator
 		// Collect schemas to show after the table (for 2xx responses with response bodies)
 		var schemasToShow = new List<(string StatusCode, IOpenApiSchema Schema)>();
 
-		foreach ((string statusCode, IOpenApiResponse response) in responses.OrderBy(r => r.Key, StringComparer.Ordinal))
+		foreach ((string statusCode, IOpenApiResponse response) in
+		         responses.OrderBy(r => r.Key, StringComparer.Ordinal))
 		{
 			// Visual status indicators: ✅ success (2xx), ⚠️ client error (4xx), ❌ server error (5xx)
 			string emoji = statusCode.StartsWith('2') ? "✅" :
@@ -603,7 +610,10 @@ sealed class MarkdownGenerator
 		// Check if this endpoint has a request body
 		bool hasRequestBody = operation.RequestBody?.Content?.Count > 0;
 		string? exampleJson = hasRequestBody ? GetRequestBodyExampleJson(operation.RequestBody!) : null;
-		string? exampleJsonCompact = hasRequestBody ? GetRequestBodyExampleJson(operation.RequestBody!, compact: true) : null;
+		string? exampleJsonCompact =
+			hasRequestBody
+				? GetRequestBodyExampleJson(operation.RequestBody!, compact: true)
+				: null;
 
 		if (mCodeSampleLanguages.Contains("shell"))
 		{
@@ -758,7 +768,8 @@ sealed class MarkdownGenerator
 			return;
 		}
 
-		foreach ((string name, IOpenApiSchema schemaInterface) in document.Components.Schemas.OrderBy(s => s.Key, StringComparer.Ordinal))
+		foreach ((string name, IOpenApiSchema schemaInterface) in
+		         document.Components.Schemas.OrderBy(s => s.Key, StringComparer.Ordinal))
 		{
 			if (schemaInterface is not OpenApiSchema schema) continue;
 

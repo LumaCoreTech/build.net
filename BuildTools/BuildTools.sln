@@ -13,6 +13,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenAPI", "OpenAPI", "{19451E29-372D-411A-8C89-FEFD399979E9}"
 	ProjectSection(SolutionItems) = preProject
 		..\OpenApi\generate-api-docs.ps1 = ..\OpenApi\generate-api-docs.ps1
+		..\OpenApi\generate-openapi-json.ps1 = ..\OpenApi\generate-openapi-json.ps1
 		..\OpenApi\README.md = ..\OpenApi\README.md
 		..\OpenApi\verify-api-docs.ps1 = ..\OpenApi\verify-api-docs.ps1
 	EndProjectSection

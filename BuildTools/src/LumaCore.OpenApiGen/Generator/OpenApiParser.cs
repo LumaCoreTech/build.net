@@ -14,7 +14,8 @@ namespace LumaCore.OpenApiGen.Generator;
 /// </summary>
 /// <remarks>
 ///     <para>
-///     This class wraps <see cref="OpenApiDocument.LoadAsync(Stream, string?, OpenApiReaderSettings?, CancellationToken)"/>
+///     This class wraps
+///     <see cref="OpenApiDocument.LoadAsync(Stream, string?, OpenApiReaderSettings?, CancellationToken)"/>
 ///     from the <c>Microsoft.OpenApi</c> package (v3.x) and provides simplified error handling
 ///     for CLI usage.
 ///     </para>
@@ -75,7 +76,8 @@ sealed class OpenApiParser
 		await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
 
 		// Parse the OpenAPI document using the v3 API (tuple deconstruction).
-		(OpenApiDocument? document, OpenApiDiagnostic? diagnostic) = await OpenApiDocument.LoadAsync(stream).ConfigureAwait(false);
+		(OpenApiDocument? document, OpenApiDiagnostic? diagnostic) =
+			await OpenApiDocument.LoadAsync(stream).ConfigureAwait(false);
 
 		// Log validation errors.
 		if (diagnostic?.Errors is { Count: > 0 })

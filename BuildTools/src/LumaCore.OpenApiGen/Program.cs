@@ -136,7 +136,8 @@ static class Program
 			// Validate input file existence.
 			if (!input.Exists)
 			{
-				await Console.Error.WriteLineAsync($"Error: Input file not found: {input.FullName}").ConfigureAwait(false);
+				await Console.Error.WriteLineAsync($"Error: Input file not found: {input.FullName}")
+					.ConfigureAwait(false);
 				Environment.ExitCode = 1;
 				return;
 			}
@@ -151,11 +152,14 @@ static class Program
 			}
 
 			// Log parsed document info.
-			await Console.Out.WriteLineAsync($"Parsed: {document.Info.Title} {document.Info.Version}").ConfigureAwait(false);
+			await Console.Out.WriteLineAsync($"Parsed: {document.Info.Title} {document.Info.Version}")
+				.ConfigureAwait(false);
 
 			// Generate Markdown documentation.
 			// Split comma-separated languages into array.
-			string[] languages = codeSamples.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			string[] languages = codeSamples.Split(
+				',',
+				StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 			var generator = new MarkdownGenerator(title ?? document.Info.Title ?? "API Documentation", languages);
 			string markdown = generator.Generate(document);
 
