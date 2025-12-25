@@ -167,6 +167,8 @@ foreach ($Version in $Versions) {
     $jsonContent = Get-Content $OutputFile -Raw
     # Replace escaped CRLF in JSON strings (\r\n → \n)
     $jsonContent = $jsonContent -replace '\\r\\n', '\n'
+    # Normalize empty objects: { } → {} (System.Text.Json quirk)
+    $jsonContent = $jsonContent -replace '\{ \}', '{}'
     # Normalize empty arrays: [ ] → [] (System.Text.Json quirk)
     $jsonContent = $jsonContent -replace '\[ \]', '[]'
     # Normalize excessive whitespace after newlines in JSON strings.
