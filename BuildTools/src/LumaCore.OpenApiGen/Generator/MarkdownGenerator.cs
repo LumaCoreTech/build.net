@@ -260,7 +260,8 @@ sealed class MarkdownGenerator
 			sb.AppendLine();
 
 			foreach ((string path, HttpMethod method, OpenApiOperation operation) in
-			         endpoints.OrderBy(e => e.Path, StringComparer.Ordinal).ThenBy(e => e.Method))
+					 endpoints.OrderBy(e => e.Path, StringComparer.Ordinal)
+						 .ThenBy(e => e.Method.Method, StringComparer.OrdinalIgnoreCase))
 			{
 				AppendEndpoint(sb, path, method, operation);
 			}
@@ -285,7 +286,8 @@ sealed class MarkdownGenerator
 		         taggedPaths.OrderBy(kv => kv.Key, StringComparer.Ordinal))
 		{
 			foreach ((string path, HttpMethod method, OpenApiOperation operation) in
-			         endpoints.OrderBy(e => e.Path, StringComparer.Ordinal).ThenBy(e => e.Method))
+					 endpoints.OrderBy(e => e.Path, StringComparer.Ordinal)
+						 .ThenBy(e => e.Method.Method, StringComparer.OrdinalIgnoreCase))
 			{
 				string methodUpper = method.ToString().ToUpperInvariant();
 				string methodDot = GetMethodDot(method);
